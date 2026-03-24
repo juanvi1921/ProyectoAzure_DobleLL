@@ -1,0 +1,14 @@
+1. Bloque de código (Varias líneas)
+Utiliza tres acentos graves ( *** ) antes y después del
+código. Para activar el resaltado de sintaxis, escribe el
+nombre del lenguaje justo después de los primeros tres
+acentos graves. AGG Universidad de Almería +3
+Ejemplo:
+\\'T python
+def saludar():
+print("Hola mundo")
+ITT
+Resultado:
+python
+def saludar():
+print("Hola mundo")

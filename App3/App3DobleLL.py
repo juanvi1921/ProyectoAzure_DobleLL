@@ -21,10 +21,21 @@ accion = st.selectbox("Acción", ["entrar", "salir"])
 
 if uploaded_file:
     matricula = leer_matricula(uploaded_file)
-    st.write("Matrícula detectada:", matricula)
 
-    mensaje = gestionar_parking(matricula, accion)
+    if matricula == "NO_DETECTADA":
+        st.error("No se ha detectado una matrícula válida")
+        st.stop()
+
+    st.success(f"Matrícula detectada: {matricula}")
+
+    mensaje, ok = gestionar_parking(matricula, accion)
     st.write(mensaje)
 
-    audio_path = despedida_tts(matricula, f"{mensaje}. ¡Hasta luego!")
-    st.audio(audio_path, format="audio/mp3")
+    if ok:
+        if accion == "entrar":
+            texto = f"{mensaje}. Bienvenido"
+        else:
+            texto = f"{mensaje}. ¡Hasta luego!"
+
+        audio_path = despedida_tts(matricula, texto)
+        st.audio(audio_path, format="audio/mp3")

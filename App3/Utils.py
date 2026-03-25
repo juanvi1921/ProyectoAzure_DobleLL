@@ -40,25 +40,25 @@ conn.commit()
 
 # --- OCR ---
 def leer_matricula(imagen):
-    """OCR usando Azure Computer Vision"""
     read_response = client_VI.read_in_stream(imagen, raw=True)
     operation_location = read_response.headers["Operation-Location"]
     operation_id = operation_location.split("/")[-1]
 
-    # Espera activa hasta obtener resultado
     while True:
         result = client_VI.get_read_result(operation_id)
         if result.status not in ['notStarted', 'running']:
             break
         time.sleep(1)
 
-    matricula = ""
+    texto_total = ""
     if result.status == "succeeded":
         for page in result.analyze_result.read_results:
             for line in page.lines:
-                matricula += line.text + " "
-    matricula = re.sub(r'[^A-Za-z0-9]', '', matricula).upper()
-    return matricula
+                texto_total += line.text + " "
+
+    matricula = extraer_matricula_valida(texto_total)
+
+    return matricula if matricula else "NO_DETECTADA"
 
 # --- Gestión parking ---
 def get_estado(matricula):
@@ -77,31 +77,45 @@ def actualizar_estado(matricula, nuevo_estado):
     conn.commit()
     return True
 
-def gestionar_parking(matricula, accion):
-    estado = get_estado(matricula)
-    mensaje = ""
-    if estado == "dentro" and accion == "entrar":
-        mensaje = "Ya estás dentro"
-    elif estado == "dentro" and accion == "salir":
-        actualizar_estado(matricula, "fuera")
-        mensaje = "Salida permitida"
-    elif estado == "fuera" and accion == "entrar":
-        actualizar_estado(matricula, "dentro")
-        mensaje = "Entrada permitida"
-    else:
-        mensaje = "No puedes salir si no has entrado"
-    return mensaje
 
 # --- Detección país de matrícula (simple regex) ---
+import re
+
 def detectar_pais_matricula(matricula):
-    if re.match(r'^\d{4}[A-Z]{3}$', matricula):
+    matricula = matricula.upper().strip()
+
+    if re.match(r'^\d{4}\s?[BCDFGHJKLMNPRSTVWXYZ]{3}$', matricula):
         return "es"
-    elif re.match(r'^[A-Z]{1,3}[A-Z]{1,2}\d{1,4}$', matricula):
+    elif re.match(r'^[A-Z]{1,3}\s?[A-Z]{1,2}\s?\d{1,4}$', matricula):
         return "de"
     elif re.match(r'^[A-Z]{2}\d{2}\s?[A-Z]{3}$', matricula):
-        return "en"
+        return "uk"
+    elif re.match(r'^[A-Z]{2}-?\d{3}-?[A-Z]{2}$', matricula):
+        return "fr"
+    elif re.match(r'^[A-Z]{2}\d{3}[A-Z]{2}$', matricula):
+        return "it"
+    elif re.match(r'^[A-Z]{2}-?\d{2}-?[A-Z]{2}$', matricula):
+        return "pt"
     else:
-        return "en"
+        return "unknown"
+
+def extraer_matricula_valida(texto):
+    texto = re.sub(r'[^A-Z0-9]', '', texto.upper())
+
+    patrones = [
+        r'\d{4}[BCDFGHJKLMNPRSTVWXYZ]{3}',  # ES
+        r'[A-Z]{2}\d{2}[A-Z]{3}',          # UK
+        r'[A-Z]{2}\d{3}[A-Z]{2}',          # IT
+        r'[A-Z]{2}\d{2}[A-Z]{2}',          # PT
+        r'[A-Z]{2}\d{3}[A-Z]{2}',          # FR simplificado
+    ]
+
+    for patron in patrones:
+        match = re.search(patron, texto)
+        if match:
+            return match.group()
+
+    return None
 
 # --- Text-to-Speech usando SDK oficial ---
 def despedida_tts(matricula, mensaje):
@@ -117,3 +131,17 @@ def despedida_tts(matricula, mensaje):
     synthesizer.speak_text(mensaje)
 
     return audio_path
+
+def gestionar_parking(matricula, accion):
+    estado = get_estado(matricula)
+
+    if estado == "dentro" and accion == "entrar":
+        return "Ya estás dentro", False
+    elif estado == "dentro" and accion == "salir":
+        actualizar_estado(matricula, "fuera")
+        return "Salida permitida", True
+    elif estado == "fuera" and accion == "entrar":
+        actualizar_estado(matricula, "dentro")
+        return "Entrada permitida", True
+    else:
+        return "No puedes salir si no has entrado", False

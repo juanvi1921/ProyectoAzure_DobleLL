@@ -37,5 +37,5 @@ if uploaded_file:
         else:
             texto = f"{mensaje}. ¡Hasta luego!"
 
-        audio_path = despedida_tts(matricula, texto)
+        audio_path = despedida_tts(matricula, accion, mensaje)
         st.audio(audio_path, format="audio/mp3")

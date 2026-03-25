@@ -84,20 +84,29 @@ import re
 def detectar_pais_matricula(matricula):
     matricula = matricula.upper().strip()
 
-    if re.match(r'^\d{4}\s?[BCDFGHJKLMNPRSTVWXYZ]{3}$', matricula):
+    if re.match(r'^\d{4}[BCDFGHJKLMNPRSTVWXYZ]{3}$', matricula):
         return "es"
-    elif re.match(r'^[A-Z]{1,3}\s?[A-Z]{1,2}\s?\d{1,4}$', matricula):
-        return "de"
-    elif re.match(r'^[A-Z]{2}\d{2}\s?[A-Z]{3}$', matricula):
+
+    elif re.match(r'^[A-Z]{2}\d{2}[A-Z]{3}$', matricula):
         return "uk"
-    elif re.match(r'^[A-Z]{2}-?\d{3}-?[A-Z]{2}$', matricula):
-        return "fr"
+
     elif re.match(r'^[A-Z]{2}\d{3}[A-Z]{2}$', matricula):
-        return "it"
-    elif re.match(r'^[A-Z]{2}-?\d{2}-?[A-Z]{2}$', matricula):
+        # 🔥 HEURÍSTICA SIMPLE
+
+        # Si contiene letras típicas más comunes en italiano
+        if any(letra in matricula for letra in ["Z", "Y", "K", "W"]):
+            return "it"
+
+        # Si no → asumimos Francia (más común en OCR)
+        return "fr"
+
+    elif re.match(r'^[A-Z]{2}\d{2}[A-Z]{2}$', matricula):
         return "pt"
-    else:
-        return "unknown"
+
+    elif re.match(r'^[A-Z]{1,3}[A-Z]{1,2}\d{2,4}$', matricula):
+        return "de"
+
+    return "unknown"
 
 def extraer_matricula_valida(texto):
     texto = re.sub(r'[^A-Z0-9]', '', texto.upper())
@@ -118,17 +127,33 @@ def extraer_matricula_valida(texto):
     return None
 
 # --- Text-to-Speech usando SDK oficial ---
-def despedida_tts(matricula, mensaje):
+def despedida_tts(matricula, accion, mensaje_base):
     pais = detectar_pais_matricula(matricula)
-    voces = {"es": "es-ES-AlvaroNeural", "en": "en-GB-RyanNeural", "de": "de-DE-KatjaNeural"}
+
+    voces = {
+        "es": "es-ES-AlvaroNeural",
+        "fr": "fr-FR-DeniseNeural",
+        "de": "de-DE-KatjaNeural",
+        "uk": "en-GB-RyanNeural",
+        "it": "it-IT-DiegoNeural",
+        "pt": "pt-PT-DuarteNeural"
+    }
+
     voz = voces.get(pais, "en-GB-RyanNeural")
+
+    # 🔥 traducir texto
+    texto = traducir_mensaje(mensaje_base, accion, pais)
 
     speech_config.speech_synthesis_voice_name = voz
     audio_path = os.path.join(os.path.dirname(__file__), "despedida.mp3")
     audio_config = speechsdk.audio.AudioOutputConfig(filename=audio_path)
 
-    synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
-    synthesizer.speak_text(mensaje)
+    synthesizer = speechsdk.SpeechSynthesizer(
+        speech_config=speech_config,
+        audio_config=audio_config
+    )
+
+    synthesizer.speak_text(texto)
 
     return audio_path
 
@@ -145,3 +170,36 @@ def gestionar_parking(matricula, accion):
         return "Entrada permitida", True
     else:
         return "No puedes salir si no has entrado", False
+
+def traducir_mensaje(mensaje, accion, pais):
+    traducciones = {
+        "es": {
+            "entrar": "Entrada permitida. Bienvenido",
+            "salir": "Salida permitida. ¡Hasta luego!"
+        },
+        "fr": {
+            "entrar": "Entrée autorisée. Bienvenue",
+            "salir": "Sortie autorisée. Au revoir"
+        },
+        "de": {
+            "entrar": "Einfahrt erlaubt. Willkommen",
+            "salir": "Ausfahrt erlaubt. Auf Wiedersehen"
+        },
+        "uk": {
+            "entrar": "Entry allowed. Welcome",
+            "salir": "Exit allowed. Goodbye"
+        },
+        "it": {
+            "entrar": "Ingresso consentito. Benvenuto",
+            "salir": "Uscita consentita. Arrivederci"
+        },
+        "pt": {
+            "entrar": "Entrada permitida. Bem-vindo",
+            "salir": "Saída permitida. Adeus"
+        }
+    }
+
+    if pais in traducciones:
+        return traducciones[pais][accion]
+    else:
+        return mensaje  # fallback

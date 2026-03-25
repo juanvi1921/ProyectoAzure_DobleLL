@@ -103,11 +103,11 @@ def extraer_matricula_valida(texto):
     texto = re.sub(r'[^A-Z0-9]', '', texto.upper())
 
     patrones = [
-        r'\d{4}[BCDFGHJKLMNPRSTVWXYZ]{3}',  # ES
+        r'\d{4}[BCDFGHJKLMNPRSTVWXYZ]{3}',  # ES (muy fiable)
         r'[A-Z]{2}\d{2}[A-Z]{3}',          # UK
-        r'[A-Z]{2}\d{3}[A-Z]{2}',          # IT
+        r'[A-Z]{2}\d{3}[A-Z]{2}',          # IT / FR
         r'[A-Z]{2}\d{2}[A-Z]{2}',          # PT
-        r'[A-Z]{2}\d{3}[A-Z]{2}',          # FR simplificado
+        r'[A-Z]{1,3}[A-Z]{1,2}\d{1,4}',    # DE (menos fiable, pero puede ayudar a filtrar ruido)
     ]
 
     for patron in patrones:
